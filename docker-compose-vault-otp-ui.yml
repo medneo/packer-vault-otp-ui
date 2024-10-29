@@ -1,0 +1,8 @@
+version: '3'
+services:
+  vault_otp_ui:
+    image: medneo-docker.jfrog.io/vault-otp-ui:1.0.0
+    ports:
+      - 127.0.0.1:8080:8080    
+    environment:
+      - VAULT_ADDR=https://secret.manager.medneo.com

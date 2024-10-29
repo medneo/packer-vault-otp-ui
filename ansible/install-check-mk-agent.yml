@@ -1,0 +1,10 @@
+---
+- name: Install the check mk agent
+  hosts: all
+  gather_facts: true
+  become: true
+  roles:
+     - role: check_mk-role
+       vars:
+         use_wato: false
+         check_mk_agent_download_url: https://checkmk.b01.dev.medneo.net/B01/check_mk/agents/check-mk-agent_1.6.0p22-1_all.deb
