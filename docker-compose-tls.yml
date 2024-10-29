@@ -16,8 +16,8 @@ services:
       - 443:443/tcp
     restart: unless-stopped
     volumes:
-      - tls_cert_nifi_ui:/etc/ssl/hitch/vault-otp-ui-medneo-com:rw
-      - tls_cert_nifi_registry:/etc/ssl/hitch/vault-otp-ui-medneo-net:rw
+      - tls_cert_vault_otp_ui_medneo_com:/etc/ssl/hitch/vault-otp-ui-medneo-com:rw
+      - tls_cert_vault_otp_ui_medneo_net:/etc/ssl/hitch/vault-otp-ui-medneo-net:rw
 
   #
   # certificate setup for the vault-otp-ui at medneo.com service
