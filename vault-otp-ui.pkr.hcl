@@ -38,11 +38,7 @@ build {
         playbook_file = "./ansible/prepare-steps.yml"
     }
     provisioner "file" {
-        source          = var.deployment_artifact_path_tls
-        destination     = "/var/srv/deployment"
-    }
-    provisioner "file" {
-        source          = var.deployment_artifact_path_vault_otp_ui
+        source          = var.deployment_artifact_path
         destination     = "/var/srv/deployment"
     }
     provisioner "ansible-local" {

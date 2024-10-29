@@ -77,16 +77,10 @@ variable "artifact_identifier" {
   default     = "local"
 }
 
-variable "deployment_artifact_path_tls" {
+variable "deployment_artifact_path" {
     type        = string
     description = "path to the folder at which the source project artifacts are located"
-    default     = "deployment-artifacts/tls"
-}
-
-variable "deployment_artifact_path_vault_otp_ui" {
-    type        = string
-    description = "path to the folder at which the source project artifacts are located"
-    default     = "deployment-artifacts/vault-otp-ui"
+    default     = "deployment-artifacts"
 }
 
 variable "git_clone_token" {
