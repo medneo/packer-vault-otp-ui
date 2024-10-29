@@ -1,0 +1,17 @@
+---
+- name: Preparation steps to put the project artifacts onto the VM template
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Ensure target folder structure exists | TLS
+      ansible.builtin.file:
+        path: /var/srv/deployment/tls
+        state: directory
+        mode: u=rwX,g=rwX,o=rwX
+      become: true
+    - name: Ensure target folder structure exists | vault-otp-ui
+      ansible.builtin.file:
+        path: /var/srv/deployment/vault-otp-ui
+        state: directory
+        mode: u=rwX,g=rwX,o=rwX
+      become: true

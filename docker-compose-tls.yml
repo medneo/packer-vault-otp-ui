@@ -1,0 +1,80 @@
+version: '3'
+services:
+  #---------------------------------------------------------------------------------------------------------------------
+  # TLS-Proxy (hitch) from (https://github.com/medneo/docker-hitch).
+  # Running hitch for TLS termination and acme.sh for getting/updating LetsEncrypt certificates. Every https is handled
+  # through this proxy.
+  #---------------------------------------------------------------------------------------------------------------------
+  tls-proxy:
+    image: medneo-docker.jfrog.io/hitch-official:1.7.2
+    depends_on:
+      - tls-proxy-acme-vault-otp-ui-medneo-com
+      - tls-proxy-acme-vault-otp-ui-medneo-net
+    command: ["hitch", "--user=hitch", "--backend=[127.0.0.1]:8080", "--frontend=[*]:443", "--ciphers=EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH", "--sni-nomatch-abort", "/etc/ssl/hitch/vault-otp-ui-medneo-com/combined.pem", "/etc/ssl/hitch/vault-otp-ui-medneo-net/combined.pem" ]
+    network_mode: "host"
+    ports:
+      - 443:443/tcp
+    restart: unless-stopped
+    volumes:
+      - tls_cert_nifi_ui:/etc/ssl/hitch/vault-otp-ui-medneo-com:rw
+      - tls_cert_nifi_registry:/etc/ssl/hitch/vault-otp-ui-medneo-net:rw
+
+  #
+  # certificate setup for the vault-otp-ui at medneo.com service
+  #
+  tls-proxy-acme-vault-otp-ui-medneo-com:
+    image: medneo-docker.jfrog.io/acme:1.1.1
+    command:
+      - daemon
+      - ${FQDN_VAULT_OTP_UI_MEDNEO_COM}
+    environment:
+      AWS_ACCESS_KEY_ID: ${ACME_MEDNEO_COM_AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${ACME_MEDNEO_COM_AWS_SECRET_ACCESS_KEY}
+    restart: unless-stopped
+    volumes:
+      - tls_cert_vault_otp_ui_medneo_com:/tls:rw
+      - acme_data_vault_otp_ui_medneo_com:/acme.sh:rw
+  tls-proxy-renew-vault-otp-ui-medneo-com:
+    image: medneo-docker.jfrog.io/renew-hitch-cert:2.1.5
+    depends_on:
+      - tls-proxy-acme-vault-otp-ui-medneo-com
+    environment:
+      HITCH_CERT: /tls/hitch/fullchain.cer
+      HITCH_KEY: /tls/hitch/key.key
+      HITCH_PEM: /tls/hitch/combined.pem
+    restart: unless-stopped
+    volumes:
+      - tls_cert_vault_otp_ui_medneo_com:/tls/hitch:rw
+
+  #
+  # certificate setup for the vault-otp-ui at medneo.net service
+  #
+  tls-proxy-acme-vault-otp-ui-medneo-net:
+    image: medneo-docker.jfrog.io/acme:1.1.1
+    command:
+      - daemon
+      - ${FQDN_VAULT_OTP_UI_MEDNEO_NET}
+    environment:
+      AWS_ACCESS_KEY_ID: ${ACME_AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${ACME_AWS_SECRET_ACCESS_KEY}
+    restart: unless-stopped
+    volumes:
+      - tls_cert_vault_otp_ui_medneo_net:/tls:rw
+      - acme_data_vault_otp_ui_medneo_net:/acme.sh:rw
+  tls-proxy-renew-vault-otp-ui-medneo-net:
+    image: medneo-docker.jfrog.io/renew-hitch-cert:2.1.5
+    depends_on:
+      - tls-proxy-acme-vault-otp-ui-medneo-net
+    environment:
+      HITCH_CERT: /tls/hitch/fullchain.cer
+      HITCH_KEY: /tls/hitch/key.key
+      HITCH_PEM: /tls/hitch/combined.pem
+    restart: unless-stopped
+    volumes:
+      - tls_cert_vault_otp_ui_medneo_net:/tls/hitch:rw
+
+volumes:
+  acme_data_vault_otp_ui_medneo_com:
+  tls_cert_vault_otp_ui_medneo_com:
+  acme_data_vault_otp_ui_medneo_net:
+  tls_cert_vault_otp_ui_medneo_net:

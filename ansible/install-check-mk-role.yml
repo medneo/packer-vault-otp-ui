@@ -1,0 +1,22 @@
+---
+- name: Install the check mk ansible role from our github repo
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Ensure git is installed
+      ansible.builtin.package:
+        name: git
+        state: present
+      become: true
+    - name: Ensure default ansible role directory exists
+      ansible.builtin.file:
+        path: /etc/ansible/roles
+        state: directory
+        mode: u=rwX,g=rX,o=rX
+      become: true
+    - name: Clone / Download the check mk role to the ansible default role path
+      ansible.builtin.git:
+        repo: "https://{{ git_clone_token }}@github.com/medneo/check_mk-role.git"
+        version: 'release-4.2.1'
+        dest: /etc/ansible/roles/check_mk-role
+      become: true
