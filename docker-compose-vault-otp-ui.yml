@@ -5,4 +5,4 @@ services:
     ports:
       - 127.0.0.1:8080:8080    
     environment:
-      - VAULT_ADDR=https://secret.manager.medneo.com
+      - VAULT_ADDR=https://secret-manager.medneo.com
