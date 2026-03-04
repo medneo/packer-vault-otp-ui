@@ -1,0 +1,21 @@
+# Optional TLS override - use with: docker compose -f docker-compose.yml -f docker-compose-tls-override.yml up -d
+# Requires: ACME_EMAIL env var. Supports vault-otp-ui.medneo.com and vault-otp-ui.beyond-imaging.com
+# Persists ACME state in volume tls_certs_caddy
+version: '3'
+services:
+  caddy-tls:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "80:80"
+    environment:
+      - ACME_AGREE=true
+      - ACME_EMAIL=${ACME_EMAIL?ACME_EMAIL required for Let's Encrypt}
+    volumes:
+      - tls_certs_caddy:/data/caddy
+      - ./Caddyfile.tls:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - vault_otp_ui
+volumes:
+  tls_certs_caddy:

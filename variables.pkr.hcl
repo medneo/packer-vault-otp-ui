@@ -78,13 +78,13 @@ variable "artifact_identifier" {
 }
 
 variable "deployment_artifact_path" {
-    type        = string
-    description = "path to the folder at which the source project artifacts are located"
-    default     = "deployment-artifacts"
+  type        = string
+  description = "path to the folder at which the source project artifacts are located"
+  default     = "deployment-artifacts"
 }
 
 variable "git_clone_token" {
-    type        = string
-    description = "github api token to enable cloning of private repos"
-    default     = ""
+  type        = string
+  description = "github api token to enable cloning of private repos"
+  default     = ""
 }

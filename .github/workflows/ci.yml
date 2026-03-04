@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  packer-validate:
+    name: Packer Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+
+      - name: Packer Format Check
+        run: packer fmt -check -recursive .
+
+      - name: Packer Init
+        run: packer init packer/aws/
+
+      - name: Packer Validate
+        run: |
+          packer validate \
+            -var "artifact_identifier=ci" \
+            -var "aws_source_ami_owner=099720109477" \
+            -var "use_golden_image_filter=false" \
+            packer/aws/
