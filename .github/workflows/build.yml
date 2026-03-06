@@ -67,11 +67,17 @@ jobs:
       - name: Packer Build
         id: build
         run: |
+          # When using Canonical Ubuntu (USE_GOLDEN_IMAGE=false), source AMI owner must be Canonical's account
+          if [ "${{ vars.USE_GOLDEN_IMAGE }}" = "false" ]; then
+            SOURCE_AMI_OWNER="099720109477"
+          else
+            SOURCE_AMI_OWNER="${{ secrets.AWS_SOURCE_AMI_OWNER }}"
+          fi
           PACKER_VARS=(
             -var "artifact_identifier=${{ steps.git.outputs.identifier }}"
             -var "is_release=${{ steps.git.outputs.is_release }}"
             -var "aws_region=${{ secrets.AWS_REGION || 'eu-central-1' }}"
-            -var "aws_source_ami_owner=${{ secrets.AWS_SOURCE_AMI_OWNER }}"
+            -var "aws_source_ami_owner=${SOURCE_AMI_OWNER}"
             -var "use_golden_image_filter=${{ vars.USE_GOLDEN_IMAGE != 'false' }}"
             -var "base_ami_name_pattern=${{ vars.BASE_AMI_NAME_PATTERN || 'ubuntu-base-*-prod-*' }}"
             -var "base_ami_ubuntu_version=${{ vars.BASE_AMI_UBUNTU_VERSION || '22.04' }}"
