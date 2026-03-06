@@ -41,6 +41,8 @@ jobs:
           DOCKER_CONFIG: ${{ github.workspace }}/.docker
 
       - name: Pull and Save Docker Images
+        env:
+          DOCKER_CONFIG: ${{ github.workspace }}/.docker
         run: |
           IMAGE="${{ vars.VAULT_OTP_UI_IMAGE || 'medneo-docker.jfrog.io/vault-otp-ui:1.0.0' }}"
           docker pull "$IMAGE"
