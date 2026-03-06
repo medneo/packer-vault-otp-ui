@@ -1,8 +1,22 @@
 version: '3'
+# Default: HTTP only. ALB terminates TLS and forwards HTTP to port 8080.
+# Health check: GET /healthz returns 200. ALB target group must use path /healthz.
+# Hostnames: vault-otp-ui.medneo.com, vault-otp-ui.beyond-imaging.com (configure in ALB/DNS)
 services:
+  healthz:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8080:8080"
+    volumes:
+      - ./nginx-healthz.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - vault_otp_ui
+
   vault_otp_ui:
     image: medneo-docker.jfrog.io/vault-otp-ui:1.0.0
-    ports:
-      - 127.0.0.1:8080:8080    
+    expose:
+      - "8080"
     environment:
       - VAULT_ADDR=https://secret-manager.medneo.com
+    restart: unless-stopped

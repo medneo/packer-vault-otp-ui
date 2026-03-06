@@ -1,3 +1,5 @@
+# DEPRECATED for AWS. Use ALB + ACM for TLS, or docker-compose-tls-override.yml (Caddy) for local TLS.
+# Kept for vSphere legacy only.
 version: '3'
 services:
   #---------------------------------------------------------------------------------------------------------------------

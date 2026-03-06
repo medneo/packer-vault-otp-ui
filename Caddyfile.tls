@@ -1,0 +1,11 @@
+# Caddyfile for optional local TLS
+# Domains: vault-otp-ui.medneo.com, vault-otp-ui.beyond-imaging.com
+# Set ACME_EMAIL env and ensure DNS points to this host for both domains
+
+{
+	email {$ACME_EMAIL}
+}
+
+vault-otp-ui.medneo.com, vault-otp-ui.beyond-imaging.com {
+	reverse_proxy vault_otp_ui:8080
+}

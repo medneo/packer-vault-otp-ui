@@ -1,0 +1,94 @@
+name: Build AMI
+
+# AMI build: on merge to master, on release-* tag push, or manual run.
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'release-*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    name: Build vault-otp-ui AMI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-central-1' }}
+          role-duration-seconds: 3600
+
+      - name: Docker Login
+        run: |
+          echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_REGISTRY_USERNAME }}" --password-stdin ${{ vars.DOCKER_REGISTRY || 'medneo-docker.jfrog.io' }}
+        env:
+          DOCKER_CONFIG: ${{ github.workspace }}/.docker
+
+      - name: Pull and Save Docker Images
+        run: |
+          IMAGE="${{ vars.VAULT_OTP_UI_IMAGE || 'medneo-docker.jfrog.io/vault-otp-ui:1.0.0' }}"
+          docker pull "$IMAGE"
+          docker pull nginx:alpine
+          docker save -o docker-images.tar "$IMAGE" nginx:alpine
+          echo "DOCKER_TAR=./docker-images.tar" >> $GITHUB_ENV
+
+      - name: Get Artifact Identifier
+        id: git
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/release-* ]]; then
+            echo "identifier=${GITHUB_REF#refs/tags/release-}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "identifier=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Packer Init
+        run: packer init packer/aws/
+
+      - name: Packer Build
+        id: build
+        run: |
+          PACKER_VARS=(
+            -var "artifact_identifier=${{ steps.git.outputs.identifier }}"
+            -var "is_release=${{ steps.git.outputs.is_release }}"
+            -var "aws_region=${{ secrets.AWS_REGION || 'eu-central-1' }}"
+            -var "aws_source_ami_owner=${{ secrets.AWS_SOURCE_AMI_OWNER }}"
+            -var "use_golden_image_filter=${{ vars.USE_GOLDEN_IMAGE != 'false' }}"
+            -var "base_ami_name_pattern=${{ vars.BASE_AMI_NAME_PATTERN || 'ubuntu-base-*-prod-*' }}"
+            -var "base_ami_ubuntu_version=${{ vars.BASE_AMI_UBUNTU_VERSION || '22.04' }}"
+            -var "docker_images_tar_path=${DOCKER_TAR:-}"
+          )
+          packer build "${PACKER_VARS[@]}" packer/aws/ | tee build.log
+
+      - name: Extract AMI ID
+        run: |
+          AMI_ID=$(grep -oE 'ami-[a-f0-9]+' build.log | tail -1)
+          echo "AMI_ID=$AMI_ID" >> $GITHUB_OUTPUT
+          echo "## vault-otp-ui AMI Built" >> $GITHUB_STEP_SUMMARY
+          echo "- **AMI ID**: \`$AMI_ID\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region**: ${{ secrets.AWS_REGION || 'eu-central-1' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Identifier**: ${{ steps.git.outputs.identifier }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Build Log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: packer-build-log
+          path: build.log
