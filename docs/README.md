@@ -8,7 +8,7 @@ TLS is terminated at the AWS Application Load Balancer. The instance serves HTTP
 
 ## Implementation Summary
 
-**GitHub Actions.** CI runs `packer fmt -check` and `packer validate` on PRs. The AMI build workflow runs only when you push a `release-*` tag or trigger it manually (Actions tab, "Build AMI", Run workflow). It does not run on push to main. Uses OIDC for AWS (no long-lived keys). AMI ID is printed in the workflow summary.
+**GitHub Actions.** CI runs `packer fmt -check` and `packer validate` on PRs. The AMI build workflow runs on merge to main/master, on push of a `release-*` tag, or when triggered manually (Actions tab, "Build AMI", Run workflow). Uses OIDC for AWS (no long-lived keys). AMI ID is printed in the workflow summary.
 
 **AWS AMI build.** Base AMI from `source_ami_filter` matching golden-images-base-os conventions: name pattern `ubuntu-base-*-prod-*`, tags `OS=ubuntu`, `Environment=prod`, `most_recent = true`. Canonical fallback uses `ubuntu/images/hvm-ssd/ubuntu-*-22.04-amd64-server-*`. Provisioning installs Docker + compose, copies app assets to `/opt/vault-otp-ui`, loads Docker images from tar (required), enables systemd service.
 
@@ -72,27 +72,115 @@ packer build \
 
 ### Triggers
 
-- Push of a tag matching `release-*` (e.g. `git tag release-1.0.0 && git push origin release-1.0.0`)
-- Manual run: Actions → Build AMI → Run workflow
+- **Merge to main or master** – build runs automatically after merge.
+- **Push of a tag** matching `release-*` (e.g. `git tag release-1.0.0 && git push origin release-1.0.0`).
+- **Manual run** – Actions → Build AMI → Run workflow (from the default branch to test).
 
-### Required Secrets
+### Setup: Secrets and Variables (step by step)
 
-| Secret | Description |
-|--------|-------------|
-| `AWS_ROLE_ARN` | IAM role ARN for OIDC (GitHub Actions assumes this role) |
-| `AWS_SOURCE_AMI_OWNER` | AWS account ID or `099720109477` for Canonical |
-| `DOCKER_REGISTRY_USERNAME` | Registry username for pulling vault-otp-ui image |
-| `DOCKER_REGISTRY_PASSWORD` | Registry password |
-| `AWS_REGION` | Optional; defaults to `eu-central-1` |
+Open the repo on GitHub → **Settings** → **Secrets and variables** → **Actions**. Use the **Secrets** tab for sensitive values and the **Variables** tab for non-sensitive ones.
 
-### Required Variables
+---
 
-| Variable | Description |
-|----------|-------------|
-| `USE_GOLDEN_IMAGE` | Set to `false` to use Canonical Ubuntu instead of golden image |
-| `BASE_AMI_NAME_PATTERN` | Default `ubuntu-base-*-prod-*` for golden image filter |
-| `DOCKER_REGISTRY` | Default `medneo-docker.jfrog.io` |
-| `VAULT_OTP_UI_IMAGE` | Default `medneo-docker.jfrog.io/vault-otp-ui:1.0.0` |
+#### Step 1: JFrog (Docker registry)
+
+You need a **service/robot** account for JFrog (not a personal one). If you already have credentials (e.g. from Jenkins or a previous pipeline):
+
+1. **Secrets** → **New repository secret**
+   - **Name:** `DOCKER_REGISTRY_USERNAME`  
+   - **Value:** username-ul JFrog (service account)
+2. **Secrets** → **New repository secret**
+   - **Name:** `DOCKER_REGISTRY_PASSWORD`  
+   - **Value:** parola sau token-ul acelui cont
+
+Optional (dacă registry-ul nu e medneo-docker.jfrog.io):
+
+3. **Variables** → **New repository variable**
+   - **Name:** `DOCKER_REGISTRY`  
+   - **Value:** `medneo-docker.jfrog.io` (sau alt host)
+
+Optional (dacă folosești alt tag pentru imaginea vault-otp-ui):
+
+4. **Variables** → **New repository variable**
+   - **Name:** `VAULT_OTP_UI_IMAGE`  
+   - **Value:** ex. `medneo-docker.jfrog.io/vault-otp-ui:1.0.0`
+
+După Step 1 poți rula workflow-ul doar până la Docker login/pull; build-ul Packer va eșua fără AWS.
+
+---
+
+#### Step 2: AWS (OIDC role și account)
+
+Workflow-ul nu folosește access key / secret key. Folosește **OIDC**: GitHub primește un token temporar și îl schimbă cu AWS pentru credențiale. Trebuie să existe deja un **IAM role** configurat pentru GitHub Actions.
+
+**Unde le poți lua:**
+
+- **Din repo-ul golden-images-base-os**  
+  Dacă ai drepturi: Settings → Secrets and variables → Actions. Acolo sunt deja:
+  - `AWS_ROLE_ARN`
+  - `AWS_SOURCE_AMI_OWNER`
+  - `AWS_REGION`  
+  Poți crea în packer-vault-otp-ui **același nume de secret** și **aceleași valori** (role ARN și account ID trebuie să rămână la fel).  
+  **Important:** IAM role-ul trebuie să aibă în trust policy și repo-ul `medneo/packer-vault-otp-ui`. Dacă trust policy permite doar `golden-images-base-os`, platform/infra trebuie să adauge și acest repo.
+
+- **De la echipa platform / infra**  
+  Dacă nu mai ai acces la secret-ele din golden-images-base-os, ceri:
+  - **ARN-ul rolului IAM** folosit pentru GitHub Actions (Packer/EC2) → îl pui în `AWS_ROLE_ARN`
+  - **Account ID-ul AWS** (12 cifre) → îl pui în `AWS_SOURCE_AMI_OWNER`
+  - (Opțional) **Region** → `AWS_REGION`, ex. `eu-central-1`
+
+Pași în GitHub (packer-vault-otp-ui):
+
+1. **Secrets** → **New repository secret**
+   - **Name:** `AWS_ROLE_ARN`  
+   - **Value:** ex. `arn:aws:iam::123456789012:role/github-actions-packer`
+2. **Secrets** → **New repository secret**
+   - **Name:** `AWS_SOURCE_AMI_OWNER`  
+   - **Value:** account ID (12 cifre) pentru golden AMI, sau `099720109477` dacă folosești Ubuntu Canonical
+3. (Opțional) **Secrets** → **New repository secret**
+   - **Name:** `AWS_REGION`  
+   - **Value:** `eu-central-1`  
+   Dacă nu îl pui, workflow-ul folosește `eu-central-1` implicit.
+
+---
+
+#### Step 3: Variables pentru base AMI
+
+**Opțiune A – Doar Ubuntu LTS (Canonical, fără golden image)**  
+Baza e ultimul Ubuntu LTS oficial de la Canonical. Recomandat dacă nu folosești golden-images-base-os.
+
+1. **Variables** → **New repository variable**
+   - **Name:** `USE_GOLDEN_IMAGE`  
+   - **Value:** `false`
+2. **Secrets:** `AWS_SOURCE_AMI_OWNER` trebuie să fie **`099720109477`** (Canonical).
+3. **Variables** → **New repository variable** (opțional)
+   - **Name:** `BASE_AMI_UBUNTU_VERSION`  
+   - **Value:** `22.04` sau `24.04` (LTS). Implicit: `22.04`.
+
+**Opțiune B – Golden image (golden-images-base-os)**  
+Baza e AMI-ul vostru `golden-ubuntu-*-prod-*`.
+
+1. **Variables** → **New repository variable**
+   - **Name:** `BASE_AMI_NAME_PATTERN`  
+   - **Value:** `golden-ubuntu-*-prod-*`
+2. **Secrets:** `AWS_SOURCE_AMI_OWNER` = account ID-ul vostru (12 cifre).
+
+---
+
+#### Checklist final
+
+| Tip   | Nume                      | Unde îl pui | Exemplu / notă |
+|-------|---------------------------|------------|-----------------|
+| Secret| `DOCKER_REGISTRY_USERNAME`| Secrets    | user JFrog      |
+| Secret| `DOCKER_REGISTRY_PASSWORD`| Secrets    | parola/token    |
+| Secret| `AWS_ROLE_ARN`           | Secrets    | de la golden-images sau infra |
+| Secret| `AWS_SOURCE_AMI_OWNER`   | Secrets    | `099720109477` (Ubuntu LTS) sau account ID (golden image) |
+| Secret| `AWS_REGION`             | Secrets (opțional) | `eu-central-1` |
+| Variable | `USE_GOLDEN_IMAGE`     | Variables  | `false` pentru Ubuntu LTS only |
+| Variable | `BASE_AMI_UBUNTU_VERSION` | Variables (opțional) | `22.04` sau `24.04` (doar când USE_GOLDEN_IMAGE=false) |
+| Variable | `BASE_AMI_NAME_PATTERN` | Variables  | `golden-ubuntu-*-prod-*` (doar când folosești golden image) |
+| Variable | `DOCKER_REGISTRY`       | Variables (opțional) | `medneo-docker.jfrog.io` |
+| Variable | `VAULT_OTP_UI_IMAGE`    | Variables (opțional) | `medneo-docker.jfrog.io/vault-otp-ui:1.0.0` |
 
 ### GitHub OIDC Trust Policy (docs only)
 
@@ -129,7 +217,7 @@ The role must allow: EC2 (run, terminate, create AMI, describe), EBS (create sna
 
 ## Rollout Steps (Manual)
 
-1. Build AMI via GitHub Actions: push a `release-*` tag (e.g. `release-1.0.0`) or run the "Build AMI" workflow manually.
+1. Build AMI via GitHub Actions: merge to main/master (auto), push a `release-*` tag, or run the "Build AMI" workflow manually.
 2. Note the AMI ID from the workflow summary.
 3. Update your launch template or Terraform to use the new AMI ID.
 4. Deploy new instances (blue/green or rolling as per your process).

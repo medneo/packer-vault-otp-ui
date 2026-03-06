@@ -1,8 +1,11 @@
 name: Build AMI
 
-# AMI build runs only on tag push or manual trigger. No automatic build on push to main.
+# AMI build: on merge to master, on release-* tag push, or manual run.
 on:
   push:
+    branches:
+      - main
+      - master
     tags:
       - 'release-*'
   workflow_dispatch:
@@ -69,6 +72,7 @@ jobs:
             -var "aws_source_ami_owner=${{ secrets.AWS_SOURCE_AMI_OWNER }}"
             -var "use_golden_image_filter=${{ vars.USE_GOLDEN_IMAGE != 'false' }}"
             -var "base_ami_name_pattern=${{ vars.BASE_AMI_NAME_PATTERN || 'ubuntu-base-*-prod-*' }}"
+            -var "base_ami_ubuntu_version=${{ vars.BASE_AMI_UBUNTU_VERSION || '22.04' }}"
             -var "docker_images_tar_path=${DOCKER_TAR:-}"
           )
           packer build "${PACKER_VARS[@]}" packer/aws/ | tee build.log
