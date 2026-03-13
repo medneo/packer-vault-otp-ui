@@ -99,6 +99,8 @@ build {
       "sudo cp /tmp/nginx-healthz.conf /opt/vault-otp-ui/nginx-healthz.conf",
       "sudo cp /tmp/docker-compose-tls-override.yml /opt/vault-otp-ui/docker-compose-tls-override.yml",
       "sudo cp /tmp/Caddyfile.tls /opt/vault-otp-ui/Caddyfile.tls",
+      "echo 'LOG_GROUP=ec2/docker' | sudo tee /opt/vault-otp-ui/.env",
+      "echo 'AWS_REGION=eu-central-1' | sudo tee -a /opt/vault-otp-ui/.env",
       "sudo chown -R ubuntu:ubuntu /opt/vault-otp-ui"
     ]
   }
