@@ -2,13 +2,17 @@ version: '3'
 # Default: HTTP only. ALB terminates TLS and forwards HTTP to port 8080.
 # Health check: GET /healthz returns 200. ALB target group must use path /healthz.
 # Hostnames: vault-otp-ui.medneo.com, vault-otp-ui.beyond-imaging.com (configure in ALB/DNS)
-# Logging: json-file (default) keeps local files. Golden image cloudwatch-agent forwards to CloudWatch
-#   (collects /var/lib/docker/containers/*/*-json.log when on EC2 with IAM).
-# Alternative: use awslogs driver per service for direct CloudWatch (no local json).
+# Logging: awslogs driver - logs go directly to CloudWatch. LOG_GROUP and AWS_REGION from .env (set by user_data).
 services:
   healthz:
     image: nginx:alpine
     restart: unless-stopped
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: ${LOG_GROUP}
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream-prefix: healthz
     ports:
       - "0.0.0.0:8080:8080"
     volumes:
@@ -18,6 +22,12 @@ services:
 
   vault_otp_ui:
     image: medneo-docker.jfrog.io/vault-otp-ui:1.0.0
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: ${LOG_GROUP}
+        awslogs-region: ${AWS_REGION}
+        awslogs-stream-prefix: vault_otp_ui
     expose:
       - "8080"
     environment:
